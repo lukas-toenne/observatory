@@ -75,11 +75,15 @@ GalacticGridSettings = MakeGridSettings(enable=False, def_color=(0.233609, 0.010
 
 
 class ObservatorySettings(bpy.types.PropertyGroup):
+    def update_generic(self, context):
+        self.update_nodegroup(context)
+
     sky_background : EnumProperty(
         name="Sky Background",
         description="Sky background type to render",
         items=sky_background_items,
         default='NONE',
+        update=update_generic,
         )
 
     longitude : FloatProperty(
@@ -89,6 +93,7 @@ class ObservatorySettings(bpy.types.PropertyGroup):
         unit='ROTATION',
         soft_min=0,
         soft_max=2.0*pi,
+        update=update_generic,
         )
 
     latitude : FloatProperty(
@@ -98,6 +103,7 @@ class ObservatorySettings(bpy.types.PropertyGroup):
         unit='ROTATION',
         soft_min=-0.5*pi,
         soft_max=0.5*pi,
+        update=update_generic,
         )
 
     def get_longitude_string(self):
@@ -129,6 +135,31 @@ class ObservatorySettings(bpy.types.PropertyGroup):
         self.equatorial_grid.draw(context, layout, "Equatorial Grid")
         self.ecliptic_grid.draw(context, layout, "Ecliptic Grid")
         self.galactic_grid.draw(context, layout, "Galactic Grid")
+
+    def get_nodegroup(self, create=False):
+        nodegroup = bpy.data.node_groups.get("ObservatorySettings")
+        if create and nodegroup is None:
+            nodegroup = bpy.data.node_groups.new("ObservatorySettings", 'ShaderNodeTree')
+        return nodegroup
+
+    def update_nodegroup(self, context):
+        nodegroup = self.get_nodegroup()
+        if nodegroup is None:
+            return
+        node = next((n for n in nodegroup.nodes if n.type=='GROUP_OUTPUT'), None)
+        if node is None:
+            node = nodegroup.nodes.new("NodeGroupOutput")
+
+        def ensure_output(prop, value, type):
+            output = nodegroup.outputs.get(prop)
+            if output is None:
+                output = nodegroup.outputs.new(type, prop)
+            socket = next(s for s in node.inputs if s.identifier==output.identifier)
+            socket.default_value = value
+        
+        ensure_output("longitude", self.longitude, "NodeSocketFloat")
+        ensure_output("latitude", self.latitude, "NodeSocketFloat")
+        ensure_output("sky_background", self.bl_rna.properties["sky_background"].enum_items[self.sky_background].value, "NodeSocketFloat")
 
 
 def register():

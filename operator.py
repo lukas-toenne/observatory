@@ -29,8 +29,18 @@ from bpy_types import Operator
 from bpy.props import BoolProperty, EnumProperty, FloatProperty, FloatVectorProperty
 
 
+class AddObservatorySettingsNodeGroup(bpy.types.Operator):
+    """Create a node group for exposing observatory settings in shaders"""
+    bl_idname = "observatory.add_settings_node_group"
+    bl_label = "Add Observatory Settings Node Group"
+
+    def execute(self, context):
+        nodegroup = context.world.observatory.get_nodegroup(create=True)
+        return {'FINISHED'}
+
+
 def register():
-    pass
+    bpy.utils.register_class(AddObservatorySettingsNodeGroup)
 
 def unregister():
-    pass
+    bpy.utils.unregister_class(AddObservatorySettingsNodeGroup)
