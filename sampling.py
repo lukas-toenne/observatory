@@ -24,46 +24,12 @@
 
 # <pep8 compliant>
 
-import bpy
-from bpy.props import BoolProperty, EnumProperty, FloatProperty, FloatVectorProperty, PointerProperty
+from mathutils import Vector, Quaternion, Euler, Matrix
+from math import pi
 
-
-class ObservatoryPanel(bpy.types.Panel):
-    bl_idname = "WORLD_PT_observatory"
-    bl_label = "Observatory"
-    bl_space_type = 'PROPERTIES'
-    bl_region_type = 'WINDOW'
-    bl_context = "world"
-
-    @classmethod
-    def poll(cls, context):
-        return True
-
-    def draw(self, context):
-        layout = self.layout
-        context.world.observatory.draw(context, layout)
-
-
-class InterferometryPanel(bpy.types.Panel):
-    bl_idname = "WORLD_PT_interferometry"
-    bl_label = "Interferometry"
-    bl_space_type = 'PROPERTIES'
-    bl_region_type = 'WINDOW'
-    bl_context = "world"
-
-    @classmethod
-    def poll(cls, context):
-        return True
-
-    def draw(self, context):
-        layout = self.layout
-        context.world.interferometry.draw(context, layout)
-
-
-def register():
-    bpy.utils.register_class(ObservatoryPanel)
-    bpy.utils.register_class(InterferometryPanel)
-
-def unregister():
-    bpy.utils.unregister_class(ObservatoryPanel)
-    bpy.utils.unregister_class(InterferometryPanel)
+def compute_sampling_image(image, antennas):
+    w, h = image.size[:]
+    pixels = [0.0] * 4 * w * h
+    for i in range(w * h):
+        pixels[4*i:4*i+4] = (1.0, 0.2, 0.7, 1.0)
+    image.pixels = pixels

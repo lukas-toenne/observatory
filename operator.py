@@ -27,9 +27,10 @@
 import bpy
 from bpy_types import Operator
 from bpy.props import BoolProperty, EnumProperty, FloatProperty, FloatVectorProperty
+from . import sampling
 
 
-class AddObservatorySettingsNodeGroup(bpy.types.Operator):
+class AddObservatorySettingsNodeGroupOperator(bpy.types.Operator):
     """Create a node group for exposing observatory settings in shaders"""
     bl_idname = "observatory.add_settings_node_group"
     bl_label = "Add Observatory Settings Node Group"
@@ -39,8 +40,34 @@ class AddObservatorySettingsNodeGroup(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class ComputeSamplingImageOperator(bpy.types.Operator):
+    """Compute the sampling image based on antenna configuration"""
+    bl_idname = "observatory.compute_sampling_image"
+    bl_label = "Compute Sampling Image"
+
+    def find_antennas(self, context):
+        coll = bpy.data.collections.get("Observatory")
+        if coll is None:
+            self.report({'ERROR'}, "Could not find collection 'Observatory' for computing base lines")
+            return
+        depsgraph = context.evaluated_depsgraph_get()
+        return [obj.evaluated_get(depsgraph).matrix_world.to_translation for obj in coll.objects]
+
+    def execute(self, context):
+        antennas = self.find_antennas(context)
+        if antennas is None:
+            return {'CANCELLED'}
+
+        img = context.world.interferometry.get_sampling_image(create=True)
+        sampling.compute_sampling_image(img, antennas)
+
+        return {'FINISHED'}
+
+
 def register():
-    bpy.utils.register_class(AddObservatorySettingsNodeGroup)
+    bpy.utils.register_class(AddObservatorySettingsNodeGroupOperator)
+    bpy.utils.register_class(ComputeSamplingImageOperator)
 
 def unregister():
-    bpy.utils.unregister_class(AddObservatorySettingsNodeGroup)
+    bpy.utils.unregister_class(AddObservatorySettingsNodeGroupOperator)
+    bpy.utils.unregister_class(ComputeSamplingImageOperator)

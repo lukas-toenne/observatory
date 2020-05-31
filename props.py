@@ -25,7 +25,7 @@
 # <pep8 compliant>
 
 import bpy
-from bpy.props import BoolProperty, EnumProperty, FloatProperty, FloatVectorProperty, PointerProperty, StringProperty
+from bpy.props import BoolProperty, EnumProperty, FloatProperty, FloatVectorProperty, IntProperty, PointerProperty, StringProperty
 from bpy.types import PropertyGroup
 from bpy_types import RNAMetaPropGroup
 from math import pi
@@ -73,6 +73,12 @@ EquatorialGridSettings = MakeGridSettings(enable=True, def_color=(0.009179, 0.45
 EclipticGridSettings = MakeGridSettings(enable=False, def_color=(0.004964, 0.137349, 0.002201))
 GalacticGridSettings = MakeGridSettings(enable=False, def_color=(0.233609, 0.010037, 0.228179))
 
+
+def get_nodegroup(create=False):
+    nodegroup = bpy.data.node_groups.get("ObservatorySettings")
+    if create and nodegroup is None:
+        nodegroup = bpy.data.node_groups.new("ObservatorySettings", 'ShaderNodeTree')
+    return nodegroup
 
 class ObservatorySettings(bpy.types.PropertyGroup):
     def update_generic(self, context):
@@ -136,14 +142,8 @@ class ObservatorySettings(bpy.types.PropertyGroup):
         self.ecliptic_grid.draw(context, layout, "Ecliptic Grid")
         self.galactic_grid.draw(context, layout, "Galactic Grid")
 
-    def get_nodegroup(self, create=False):
-        nodegroup = bpy.data.node_groups.get("ObservatorySettings")
-        if create and nodegroup is None:
-            nodegroup = bpy.data.node_groups.new("ObservatorySettings", 'ShaderNodeTree')
-        return nodegroup
-
     def update_nodegroup(self, context):
-        nodegroup = self.get_nodegroup()
+        nodegroup = get_nodegroup()
         if nodegroup is None:
             return
         node = next((n for n in nodegroup.nodes if n.type=='GROUP_OUTPUT'), None)
@@ -162,20 +162,78 @@ class ObservatorySettings(bpy.types.PropertyGroup):
         ensure_output("sky_background", self.bl_rna.properties["sky_background"].enum_items[self.sky_background].value, "NodeSocketFloat")
 
 
+sampling_id = "ObservatorySampling"
+
+class InterferometrySettings(bpy.types.PropertyGroup):
+    image_width : IntProperty(
+        name="Image Width",
+        description="Width of brightness and visibility images",
+        min=1,
+        soft_max=1024,
+        default=128,
+        )
+
+    image_height : IntProperty(
+        name="Image Height",
+        description="Height of brightness and visibility images",
+        min=1,
+        soft_max=1024,
+        default=128,
+        )
+
+    def draw(self, context, layout):
+        layout.label(text="Image size:")
+        row = layout.row(align=True)
+        row.prop(self, "image_width", text="")
+        row.prop(self, "image_height", text="")
+
+        layout.separator()
+        layout.operator("observatory.compute_sampling_image")
+        img, data, prop = self.get_image_data_prop(sampling_id)
+        if data:
+            layout.template_ID_preview(data, prop)
+
+    def get_image_data_prop(self, name, create=False):
+        img = bpy.data.images.get(name)
+        if create and img is None:
+            # img = bpy.data.images.new(name, self.image_width, self.image_height, float_buffer=True, is_data=True)
+            img = bpy.data.images.new(name, self.image_width, self.image_height)
+            img.use_fake_user = True
+
+        nodegroup = get_nodegroup(create=create)
+        data = nodegroup.nodes.get(name)
+        if create and data is None:
+            data = nodegroup.nodes.new("ShaderNodeTexImage")
+            data.name = name
+            data.image = img
+        return img, data, "image"
+
+    def get_image(self, name, create=False):
+        img, data, prop = self.get_image_data_prop(name, create=create)
+        return img
+
+    def get_sampling_image(self, create=False):
+        return self.get_image(sampling_id, create=create)
+
+
 def register():
     bpy.utils.register_class(HorizontalGridSettings)
     bpy.utils.register_class(EquatorialGridSettings)
     bpy.utils.register_class(EclipticGridSettings)
     bpy.utils.register_class(GalacticGridSettings)
     bpy.utils.register_class(ObservatorySettings)
+    bpy.utils.register_class(InterferometrySettings)
 
     bpy.types.World.observatory = PointerProperty(type=ObservatorySettings)
+    bpy.types.World.interferometry = PointerProperty(type=InterferometrySettings)
 
 def unregister():
     del bpy.types.World.observatory
+    del bpy.types.World.interferometry
 
     bpy.utils.unregister_class(HorizontalGridSettings)
     bpy.utils.unregister_class(EquatorialGridSettings)
     bpy.utils.unregister_class(EclipticGridSettings)
     bpy.utils.unregister_class(GalacticGridSettings)
     bpy.utils.unregister_class(ObservatorySettings)
+    bpy.utils.unregister_class(InterferometrySettings)
