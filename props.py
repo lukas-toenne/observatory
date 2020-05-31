@@ -39,12 +39,16 @@ sky_background_items = [
 ]
 
 
-def MakeGridSettings(enable=False, def_color=(0.8, 0.8, 0.8)):
+def MakeGridSettings(def_enabled=False, def_color=(0.8, 0.8, 0.8)):
+    def update_generic(self, context):
+        self.id_data.observatory.update_generic(context)
+
     class GridSettings(PropertyGroup):
-        show_grid : BoolProperty(
+        enabled : BoolProperty(
             name="Show Grid",
             description="Enable background grid display",
-            default=enable,
+            default=def_enabled,
+            update=update_generic,
             )
 
         color : FloatVectorProperty(
@@ -53,25 +57,26 @@ def MakeGridSettings(enable=False, def_color=(0.8, 0.8, 0.8)):
             subtype='COLOR',
             size=3,
             default=def_color,
+            update=update_generic,
             )
 
         def draw(self, context, layout, label):
             col = layout.box()
 
             row = col.row(align=True)
-            row.prop(self, "show_grid", text="")
+            row.prop(self, "enabled", text="")
             row.label(text=label)
 
             col2 = col.column(align=True)
-            col2.enabled = self.show_grid
+            col2.enabled = self.enabled
             col2.prop(self, "color")
 
     return GridSettings
 
-HorizontalGridSettings = MakeGridSettings(enable=False, def_color=(0.309342, 0.186442, 0.012358))
-EquatorialGridSettings = MakeGridSettings(enable=True, def_color=(0.009179, 0.459465, 0.8))
-EclipticGridSettings = MakeGridSettings(enable=False, def_color=(0.004964, 0.137349, 0.002201))
-GalacticGridSettings = MakeGridSettings(enable=False, def_color=(0.233609, 0.010037, 0.228179))
+HorizontalGridSettings = MakeGridSettings(def_enabled=False, def_color=(0.309342, 0.186442, 0.012358))
+EquatorialGridSettings = MakeGridSettings(def_enabled=True, def_color=(0.009179, 0.459465, 0.8))
+EclipticGridSettings = MakeGridSettings(def_enabled=False, def_color=(0.004964, 0.137349, 0.002201))
+GalacticGridSettings = MakeGridSettings(def_enabled=False, def_color=(0.233609, 0.010037, 0.228179))
 
 
 def get_nodegroup(create=False):
@@ -157,9 +162,17 @@ class ObservatorySettings(bpy.types.PropertyGroup):
             socket = next(s for s in node.inputs if s.identifier==output.identifier)
             socket.default_value = value
         
-        ensure_output("longitude", self.longitude, "NodeSocketFloat")
-        ensure_output("latitude", self.latitude, "NodeSocketFloat")
-        ensure_output("sky_background", self.bl_rna.properties["sky_background"].enum_items[self.sky_background].value, "NodeSocketFloat")
+        ensure_output("Longitude", self.longitude, "NodeSocketFloat")
+        ensure_output("Latitude", self.latitude, "NodeSocketFloat")
+        ensure_output("Sky Background", self.bl_rna.properties["sky_background"].enum_items[self.sky_background].value, "NodeSocketFloat")
+
+        def ensure_grid_outputs(grid, name):
+            ensure_output("{} Enabled".format(name), grid.enabled, "NodeSocketFloat")
+            ensure_output("{} Color".format(name), (*grid.color[:3], 1.0), "NodeSocketColor")
+        ensure_grid_outputs(self.horizontal_grid, "Horizontal Grid")
+        ensure_grid_outputs(self.equatorial_grid, "Equatorial Grid")
+        ensure_grid_outputs(self.ecliptic_grid, "Ecliptic Grid")
+        ensure_grid_outputs(self.galactic_grid, "Galactic Grid")
 
 
 sampling_id = "ObservatorySampling"
