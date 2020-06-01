@@ -24,6 +24,8 @@
 
 # <pep8 compliant>
 
+from bpy.props import FloatProperty, FloatVectorProperty
+from bpy.types import PropertyGroup
 from mathutils import Vector, Quaternion, Euler, Matrix
 import time
 from math import pi
@@ -51,3 +53,79 @@ def parse_hour_angle(hourstr, default):
 
     print(m.group("hours"), m.group("minutes"), m.group("seconds"))
     return 0.0
+
+def MakeCelestialCoordinate(default=(0.0, 0.0), update=None):
+    class CelestialCoordinate(PropertyGroup):
+        co : FloatVectorProperty(
+            name="Coordinate",
+            description="Coordinate in angles east and north",
+            size=2,
+            subtype='EULER',
+            unit='ROTATION',
+            default=default,
+            update=update,
+            )
+
+        def _get_longitude(self):
+            return self.co[0]
+        def _set_longitude(self, value):
+            self.co[0] = value
+        longitude : FloatProperty(
+            name="Longitude",
+            description="Longitude angle",
+            subtype='ANGLE',
+            unit='ROTATION',
+            default=default[0],
+            soft_min=-pi,
+            soft_max=pi,
+            get=_get_longitude,
+            set=_set_longitude,
+            )
+
+        def _get_hour(self):
+            return self.co[0] * 12.0 / pi
+        def _set_hour(self, value):
+            self.co[0] = value * pi / 12.0
+        hour : FloatProperty(
+            name="Hour",
+            description="Longitude as hour angle",
+            subtype='TIME',
+            unit='TIME',
+            default=default[0] * 12.0 / pi,
+            soft_min=-12.0,
+            soft_max=12.0,
+            get=_get_hour,
+            set=_set_hour,
+            )
+
+        def _get_latitude(self):
+            return self.co[1]
+        def _set_latitude(self, value):
+            self.co[1] = value
+        latitude : FloatProperty(
+            name="Latitude",
+            description="Latitude angle",
+            subtype='ANGLE',
+            unit='ROTATION',
+            default=default[1],
+            soft_min=-pi/2,
+            soft_max=pi,
+            get=_get_latitude,
+            set=_set_latitude,
+            )
+
+        def draw_long_lat(self, context, layout, label=None):
+            row = layout.row(align=True)
+            if label:
+                row.label(text=label)
+            row.prop(self, "longitude")
+            row.prop(self, "latitude")
+
+        def draw_hour_lat(self, context, layout, label=None):
+            row = layout.row(align=True)
+            if label:
+                row.label(text=label)
+            row.prop(self, "hour")
+            row.prop(self, "latitude")
+
+    return CelestialCoordinate

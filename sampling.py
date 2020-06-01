@@ -27,7 +27,7 @@
 from mathutils import Vector, Quaternion, Euler, Matrix
 from math import pi
 
-def compute_sampling_image(image, antennas):
+def compute_sampling_image(image, world, antennas):
     w, h = image.size[:]
     pixels = [0.0] * 4 * w * h
     for i in range(w * h):

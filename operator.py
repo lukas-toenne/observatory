@@ -54,11 +54,15 @@ class ComputeSamplingImageOperator(bpy.types.Operator):
         return [obj.evaluated_get(depsgraph).matrix_world.to_translation for obj in coll.objects]
 
     def execute(self, context):
+        world = context.world
+
         antennas = self.find_antennas(context)
         if antennas is None:
             return {'CANCELLED'}
 
-        img = context.world.interferometry.get_sampling_image(create=True)
+        baselines = world.observatory.get_projected_baselines(antennas)
+
+        img = world.interferometry.get_sampling_image(create=True)
         sampling.compute_sampling_image(img, antennas)
 
         return {'FINISHED'}

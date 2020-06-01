@@ -33,22 +33,26 @@ from typing import get_type_hints
 from .coordinates import *
 
 
+# Speed of light
+c = 299792458.0
+
+
 sky_background_items = [
     ('NONE', "None", "No background"),
     ('VISIBLE', "Visible", "Stars in the visible spectrum"),
 ]
 
 
-def MakeGridSettings(def_enabled=False, def_color=(0.8, 0.8, 0.8)):
-    def update_generic(self, context):
-        self.id_data.observatory.update_generic(context)
+def update_property_group(self, context):
+    self.id_data.observatory.update_generic(context)
 
+def MakeGridSettings(def_enabled=False, def_color=(0.8, 0.8, 0.8)):
     class GridSettings(PropertyGroup):
         enabled : BoolProperty(
             name="Show Grid",
             description="Enable background grid display",
             default=def_enabled,
-            update=update_generic,
+            update=update_property_group,
             )
 
         color : FloatVectorProperty(
@@ -57,7 +61,7 @@ def MakeGridSettings(def_enabled=False, def_color=(0.8, 0.8, 0.8)):
             subtype='COLOR',
             size=3,
             default=def_color,
-            update=update_generic,
+            update=update_property_group,
             )
 
         def draw(self, context, layout, label):
@@ -73,11 +77,12 @@ def MakeGridSettings(def_enabled=False, def_color=(0.8, 0.8, 0.8)):
 
     return GridSettings
 
+ObservatoryLocation = MakeCelestialCoordinate(update=update_property_group)
+TargetCoordinate = MakeCelestialCoordinate(default=(0.0, pi/2), update=update_property_group)
 HorizontalGridSettings = MakeGridSettings(def_enabled=False, def_color=(0.309342, 0.186442, 0.012358))
 EquatorialGridSettings = MakeGridSettings(def_enabled=True, def_color=(0.009179, 0.459465, 0.8))
 EclipticGridSettings = MakeGridSettings(def_enabled=False, def_color=(0.004964, 0.137349, 0.002201))
 GalacticGridSettings = MakeGridSettings(def_enabled=False, def_color=(0.233609, 0.010037, 0.228179))
-
 
 def get_nodegroup(create=False):
     nodegroup = bpy.data.node_groups.get("ObservatorySettings")
@@ -89,6 +94,8 @@ class ObservatorySettings(bpy.types.PropertyGroup):
     def update_generic(self, context):
         self.update_nodegroup(context)
 
+    location : PointerProperty(type=ObservatoryLocation)
+
     sky_background : EnumProperty(
         name="Sky Background",
         description="Sky background type to render",
@@ -97,50 +104,18 @@ class ObservatorySettings(bpy.types.PropertyGroup):
         update=update_generic,
         )
 
-    longitude : FloatProperty(
-        name="Longitude",
-        description="Observatory location longitude",
-        subtype='ANGLE',
-        unit='ROTATION',
-        soft_min=0,
-        soft_max=2.0*pi,
-        update=update_generic,
-        )
-
-    latitude : FloatProperty(
-        name="Latitude",
-        description="Observatory location latitude",
-        subtype='ANGLE',
-        unit='ROTATION',
-        soft_min=-0.5*pi,
-        soft_max=0.5*pi,
-        update=update_generic,
-        )
-
-    def get_longitude_string(self):
-        return angle_to_hour(self.longitude)
-    def set_longitude_string(self, value):
-        self.longitude = parse_hour_angle(value, self.longitude)
-    longitude_string : StringProperty(
-        name="Longitude",
-        description="Observatory location longitude",
-        options={'SKIP_SAVE'},
-        get=get_longitude_string,
-        set=set_longitude_string,
-        )
-
     horizontal_grid : PointerProperty(type=HorizontalGridSettings)
     equatorial_grid : PointerProperty(type=EquatorialGridSettings)
     ecliptic_grid : PointerProperty(type=EclipticGridSettings)
     galactic_grid : PointerProperty(type=GalacticGridSettings)
 
+    def get_projected_baselines(antennas):
+        return []
+
     def draw(self, context, layout):
         layout.prop(self, "sky_background")
 
-        row = layout.row(align=True)
-        # row.prop(self, "longitude_string")
-        row.prop(self, "longitude")
-        row.prop(self, "latitude")
+        self.location.draw_long_lat(context, layout)
 
         self.horizontal_grid.draw(context, layout, "Horizontal Grid")
         self.equatorial_grid.draw(context, layout, "Equatorial Grid")
@@ -161,9 +136,9 @@ class ObservatorySettings(bpy.types.PropertyGroup):
                 output = nodegroup.outputs.new(type, prop)
             socket = next(s for s in node.inputs if s.identifier==output.identifier)
             socket.default_value = value
-        
-        ensure_output("Longitude", self.longitude, "NodeSocketFloat")
-        ensure_output("Latitude", self.latitude, "NodeSocketFloat")
+
+        ensure_output("Location Longitude", self.location.longitude, "NodeSocketFloat")
+        ensure_output("Location Latitude", self.location.latitude, "NodeSocketFloat")
         ensure_output("Sky Background", self.bl_rna.properties["sky_background"].enum_items[self.sky_background].value, "NodeSocketFloat")
 
         def ensure_grid_outputs(grid, name):
@@ -176,8 +151,45 @@ class ObservatorySettings(bpy.types.PropertyGroup):
 
 
 sampling_id = "ObservatorySampling"
+default_frequency = 1.428e9
 
 class InterferometrySettings(bpy.types.PropertyGroup):
+    target : PointerProperty(type=TargetCoordinate)
+
+    frequency : FloatProperty(
+        name="Frequency",
+        description="Frequency measured by antennas",
+        default=default_frequency,
+        min=0.0,
+        soft_min=10e6,
+        soft_max=1e12,
+        )
+
+    def get_frequency_mhz(self):
+        return self.frequency * 1.0e-6
+    def set_frequency_mhz(self, value):
+        self.frequency = value * 1.0e6
+    frequency_mhz : FloatProperty(
+        name="Frequency",
+        description="Frequency measured by antennas in MHz",
+        default=default_frequency * 1.0e-6,
+        get=get_frequency_mhz,
+        set=set_frequency_mhz,
+        )
+
+    def get_wavelength(self):
+        return c / self.frequency
+    def set_wavelength(self, value):
+        self.frequency = c / value
+    wavelength : FloatProperty(
+        name="Wavelength",
+        description="Wavelength measured by antennas",
+        default=c / default_frequency,
+        unit='LENGTH',
+        get=get_wavelength,
+        set=set_wavelength,
+        )
+
     image_width : IntProperty(
         name="Image Width",
         description="Width of brightness and visibility images",
@@ -195,6 +207,11 @@ class InterferometrySettings(bpy.types.PropertyGroup):
         )
 
     def draw(self, context, layout):
+        self.target.draw_long_lat(context, layout, label="Target")
+
+        layout.prop(self, "frequency_mhz", text="Frequency (MHz)")
+        layout.prop(self, "wavelength")
+
         layout.label(text="Image size:")
         row = layout.row(align=True)
         row.prop(self, "image_width", text="")
@@ -230,6 +247,8 @@ class InterferometrySettings(bpy.types.PropertyGroup):
 
 
 def register():
+    bpy.utils.register_class(ObservatoryLocation)
+    bpy.utils.register_class(TargetCoordinate)
     bpy.utils.register_class(HorizontalGridSettings)
     bpy.utils.register_class(EquatorialGridSettings)
     bpy.utils.register_class(EclipticGridSettings)
@@ -244,6 +263,8 @@ def unregister():
     del bpy.types.World.observatory
     del bpy.types.World.interferometry
 
+    bpy.utils.unregister_class(ObservatoryLocation)
+    bpy.utils.unregister_class(TargetCoordinate)
     bpy.utils.unregister_class(HorizontalGridSettings)
     bpy.utils.unregister_class(EquatorialGridSettings)
     bpy.utils.unregister_class(EclipticGridSettings)
