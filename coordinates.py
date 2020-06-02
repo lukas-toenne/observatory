@@ -28,7 +28,7 @@ from bpy.props import FloatProperty, FloatVectorProperty
 from bpy.types import PropertyGroup
 from mathutils import Vector, Quaternion, Euler, Matrix
 import time
-from math import pi
+from math import *
 import re
 
 def hour_to_angle(hourstr):
@@ -55,7 +55,7 @@ def parse_hour_angle(hourstr, default):
     return 0.0
 
 def MakeCelestialCoordinate(default=(0.0, 0.0), update=None):
-    class CelestialCoordinate(PropertyGroup):
+    class CelestialCoordinateProp(PropertyGroup):
         co : FloatVectorProperty(
             name="Coordinate",
             description="Coordinate in angles east and north",
@@ -128,4 +128,18 @@ def MakeCelestialCoordinate(default=(0.0, 0.0), update=None):
             row.prop(self, "hour")
             row.prop(self, "latitude")
 
-    return CelestialCoordinate
+    return CelestialCoordinateProp
+
+def horizontal_to_equatorial(co, observer_latitude):
+    A = co[0]
+    a = co[1]
+    h = atan2(sin(A), cos(A)*sin(observer_latitude) + tan(a)*cos(observer_latitude))
+    delta = asin(sin(a)*sin(observer_latitude) - cos(a)*cos(A)*cos(observer_latitude))
+    return (h, delta)
+
+def equatorial_to_horizontal(co, observer_latitude):
+    h = co[0]
+    delta = co[1]
+    A = atan2(sin(h), cos(h)*sin(observer_latitude) - tan(delta)*cos(observer_latitude))
+    a = asin(sin(delta)*sin(observer_latitude) + cos(delta)*cos(h)*cos(observer_latitude))
+    return (A, a)
