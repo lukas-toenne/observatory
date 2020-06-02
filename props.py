@@ -28,6 +28,7 @@ import bpy
 from bpy.props import BoolProperty, EnumProperty, FloatProperty, FloatVectorProperty, IntProperty, PointerProperty, StringProperty
 from bpy.types import PropertyGroup
 from bpy_types import RNAMetaPropGroup
+from bpy.app.handlers import persistent
 from math import pi
 from typing import get_type_hints
 from .coordinates import *
@@ -154,7 +155,22 @@ sampling_id = "ObservatorySampling"
 default_frequency = 1.428e9
 
 class InterferometrySettings(bpy.types.PropertyGroup):
+    @property
+    def observatory(self):
+        return self.id_data.observatory
+
     target : PointerProperty(type=TargetCoordinate)
+
+    def get_target_horizontal(self):
+        return equatorial_to_horizontal(self.target.co, self.observatory.location.latitude)
+    target_horizontal : FloatVectorProperty(
+        name="Horizontal Target",
+        description="Target coordinates in horizontal reference frame",
+        size=2,
+        subtype='EULER',
+        unit='ROTATION',
+        get=get_target_horizontal,
+        )
 
     frequency : FloatProperty(
         name="Frequency",
@@ -246,6 +262,11 @@ class InterferometrySettings(bpy.types.PropertyGroup):
         return self.get_image(sampling_id, create=create)
 
 
+# @persistent
+# def load_handler(dummy):
+#     bpy.app.driver_namespace['horizontal_to_equatorial'] = horizontal_to_equatorial
+#     bpy.app.driver_namespace['equatorial_to_horizontal'] = equatorial_to_horizontal
+
 def register():
     bpy.utils.register_class(ObservatoryLocation)
     bpy.utils.register_class(TargetCoordinate)
@@ -259,6 +280,9 @@ def register():
     bpy.types.World.observatory = PointerProperty(type=ObservatorySettings)
     bpy.types.World.interferometry = PointerProperty(type=InterferometrySettings)
 
+    # load_handler(None)
+    # bpy.app.handlers.load_post.append(load_handler)
+
 def unregister():
     del bpy.types.World.observatory
     del bpy.types.World.interferometry
@@ -271,3 +295,7 @@ def unregister():
     bpy.utils.unregister_class(GalacticGridSettings)
     bpy.utils.unregister_class(ObservatorySettings)
     bpy.utils.unregister_class(InterferometrySettings)
+
+    # bpy.app.handlers.load_post.remove(load_handler)
+    # del bpy.app.driver_namespace['horizontal_to_equatorial']
+    # del bpy.app.driver_namespace['equatorial_to_horizontal']
