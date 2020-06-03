@@ -87,21 +87,24 @@ def compute_sampling_image(world, antennas):
     sampling = np.zeros((w, h), dtype=np.float32)
 
     # Construct sampling from baselines
-    w2 = int(w / 2)
-    h2 = int(h / 2)
+    w2 = w / 2
+    h2 = h / 2
     for i, a in enumerate(antennas):
         for b in antennas[i+1:]:
             B = b.xy - a.xy
             s = B * scale
             # Symmetric sampling in the uv space
-            sampling[w2 + int(s.x), h2 + int(s.y)] = 1.0
-            sampling[w2 - int(s.x), h2 - int(s.y)] = 1.0
+            sampling[int(w2 + s.x), int(h2 + s.y)] = 1.0
+            sampling[int(w2 - s.x), int(h2 - s.y)] = 1.0
 
-    # sampling[4, 4] = 1.0
-
-    result = sampling
+    # Compute point spread function
+    sampling = fft.ifftshift(sampling)
+    pointspread = fft.irfft2(sampling, norm="ortho")
+    # pointspread_r, pointspread_i = np.split(pointspread, 2, axis=-1)
+    pointspread_r = pointspread[0::1, 0::2]
+    print(sampling.shape, pointspread.shape, pointspread_r.shape)
 
     image = world.interferometry.get_sampling_image(create=True)
-    ndarray_to_image(result, image, allow_resize=True)
+    ndarray_to_image(pointspread_r * 10.0, image, allow_resize=True)
 
     return True
