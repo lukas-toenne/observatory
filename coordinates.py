@@ -130,16 +130,16 @@ def MakeCelestialCoordinate(default=(0.0, 0.0), update=None):
 
     return CelestialCoordinateProp
 
-def horizontal_to_equatorial(co, observer_latitude):
+def horizontal_to_equatorial(co, observer, sidereal_angle):
     A = co[0]
     a = co[1]
-    h = atan2(sin(A), cos(A)*sin(observer_latitude) + tan(a)*cos(observer_latitude))
-    delta = asin(sin(a)*sin(observer_latitude) - cos(a)*cos(A)*cos(observer_latitude))
-    return (h, delta)
+    h = atan2(sin(A), cos(A)*sin(observer.co[1]) + tan(a)*cos(observer.co[1]))
+    delta = asin(sin(a)*sin(observer.co[1]) - cos(a)*cos(A)*cos(observer.co[1]))
+    return (h + observer.co[0] + sidereal_angle, delta)
 
-def equatorial_to_horizontal(co, observer_latitude):
-    h = co[0]
+def equatorial_to_horizontal(co, observer, sidereal_angle):
+    h = co[0] - observer.co[0] - sidereal_angle
     delta = co[1]
-    A = atan2(sin(h), cos(h)*sin(observer_latitude) - tan(delta)*cos(observer_latitude))
-    a = asin(sin(delta)*sin(observer_latitude) + cos(delta)*cos(h)*cos(observer_latitude))
+    A = atan2(sin(h), cos(h)*sin(observer.co[1]) - tan(delta)*cos(observer.co[1]))
+    a = asin(sin(delta)*sin(observer.co[1]) + cos(delta)*cos(h)*cos(observer.co[1]))
     return (A, a)

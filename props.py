@@ -29,13 +29,18 @@ from bpy.props import BoolProperty, EnumProperty, FloatProperty, FloatVectorProp
 from bpy.types import PropertyGroup
 from bpy_types import RNAMetaPropGroup
 from bpy.app.handlers import persistent
-from math import pi
+from math import *
 from typing import get_type_hints
+import time
 from .coordinates import *
 
 
 # Speed of light
 c = 299792458.0
+
+# Length of sidereal day
+solar_to_sidereal = 366.24/365.24
+sidereal_to_solar = 365.24/366.24
 
 
 sky_background_items = [
@@ -78,6 +83,42 @@ def MakeGridSettings(def_enabled=False, def_color=(0.8, 0.8, 0.8)):
 
     return GridSettings
 
+class TimeProp(PropertyGroup):
+    day : IntProperty(
+        name="Day",
+        description="Day since the J2000 epoch",
+        default=7305,
+        update=update_property_group,
+        )
+
+    hour : FloatProperty(
+        name="Hour",
+        description="Hour of the day",
+        default=12.0,
+        min=0.0,
+        max=24.0,
+        update=update_property_group,
+        )
+
+    def get_earth_rotation(self):
+        f = modf((self.day + self.hour / 24.0) * solar_to_sidereal)[0]
+        return f * 2*pi if f > 0.0 else (1.0 - f) * 2*pi
+    earth_rotation : FloatProperty(
+        name="Earth Rotation Angle",
+        description="Earth rotation angle relative to fixed star background since epoch",
+        default=pi,
+        min=0.0,
+        max=pi*2,
+        get=get_earth_rotation,
+        )
+
+    # TODO add time conversions to python time, Gregorian calender dates, etc.
+
+    def draw(self, context, layout):
+        col = layout.column(align=True)
+        col.prop(self, "day")
+        col.prop(self, "hour")
+
 ObservatoryLocation = MakeCelestialCoordinate(update=update_property_group)
 TargetCoordinate = MakeCelestialCoordinate(default=(0.0, pi/2), update=update_property_group)
 HorizontalGridSettings = MakeGridSettings(def_enabled=False, def_color=(0.309342, 0.186442, 0.012358))
@@ -96,6 +137,8 @@ class ObservatorySettings(bpy.types.PropertyGroup):
         self.update_nodegroup(context)
 
     location : PointerProperty(type=ObservatoryLocation)
+
+    time : PointerProperty(type=TimeProp)
 
     sky_background : EnumProperty(
         name="Sky Background",
@@ -117,6 +160,7 @@ class ObservatorySettings(bpy.types.PropertyGroup):
         layout.prop(self, "sky_background")
 
         self.location.draw_long_lat(context, layout)
+        self.time.draw(context, layout)
 
         self.horizontal_grid.draw(context, layout, "Horizontal Grid")
         self.equatorial_grid.draw(context, layout, "Equatorial Grid")
@@ -162,7 +206,7 @@ class InterferometrySettings(bpy.types.PropertyGroup):
     target : PointerProperty(type=TargetCoordinate)
 
     def get_target_horizontal(self):
-        return equatorial_to_horizontal(self.target.co, self.observatory.location.latitude)
+        return equatorial_to_horizontal(self.target.co, self.observatory.location, self.observatory.time.earth_rotation)
     target_horizontal : FloatVectorProperty(
         name="Horizontal Target",
         description="Target coordinates in horizontal reference frame",
@@ -270,6 +314,7 @@ class InterferometrySettings(bpy.types.PropertyGroup):
 def register():
     bpy.utils.register_class(ObservatoryLocation)
     bpy.utils.register_class(TargetCoordinate)
+    bpy.utils.register_class(TimeProp)
     bpy.utils.register_class(HorizontalGridSettings)
     bpy.utils.register_class(EquatorialGridSettings)
     bpy.utils.register_class(EclipticGridSettings)
@@ -289,6 +334,7 @@ def unregister():
 
     bpy.utils.unregister_class(ObservatoryLocation)
     bpy.utils.unregister_class(TargetCoordinate)
+    bpy.utils.unregister_class(TimeProp)
     bpy.utils.unregister_class(HorizontalGridSettings)
     bpy.utils.unregister_class(EquatorialGridSettings)
     bpy.utils.unregister_class(EclipticGridSettings)
