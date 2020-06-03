@@ -93,8 +93,9 @@ def compute_sampling_image(world, antennas):
         for b in antennas[i+1:]:
             B = b.xy - a.xy
             s = B * scale
-            print(B, s)
+            # Symmetric sampling in the uv space
             sampling[w2 + int(s.x), h2 + int(s.y)] = 1.0
+            sampling[w2 - int(s.x), h2 - int(s.y)] = 1.0
 
     # sampling[4, 4] = 1.0
 
