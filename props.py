@@ -153,9 +153,6 @@ class ObservatorySettings(bpy.types.PropertyGroup):
     ecliptic_grid : PointerProperty(type=EclipticGridSettings)
     galactic_grid : PointerProperty(type=GalacticGridSettings)
 
-    def get_projected_baselines(antennas):
-        return []
-
     def draw(self, context, layout):
         layout.prop(self, "sky_background")
 

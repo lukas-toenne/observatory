@@ -51,7 +51,7 @@ class ComputeSamplingImageOperator(bpy.types.Operator):
             self.report({'ERROR'}, "Could not find collection 'Observatory' for computing base lines")
             return
         depsgraph = context.evaluated_depsgraph_get()
-        return [obj.evaluated_get(depsgraph).matrix_world.to_translation for obj in coll.objects]
+        return [obj.evaluated_get(depsgraph).matrix_world.to_translation() for obj in coll.objects]
 
     def execute(self, context):
         world = context.world
@@ -60,12 +60,11 @@ class ComputeSamplingImageOperator(bpy.types.Operator):
         if antennas is None:
             return {'CANCELLED'}
 
-        baselines = world.observatory.get_projected_baselines(antennas)
-
         img = world.interferometry.get_sampling_image(create=True)
-        sampling.compute_sampling_image(img, antennas)
+        if sampling.compute_sampling_image(world, antennas):
+            return {'FINISHED'}
 
-        return {'FINISHED'}
+        return {'CANCELLED'}
 
 
 def register():
