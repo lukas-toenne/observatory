@@ -109,7 +109,7 @@ def MakeCelestialCoordinate(default=(0.0, 0.0), update=None):
             unit='ROTATION',
             default=default[1],
             soft_min=-pi/2,
-            soft_max=pi,
+            soft_max=pi/2,
             get=_get_latitude,
             set=_set_latitude,
             )
