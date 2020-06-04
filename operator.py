@@ -27,7 +27,7 @@
 import bpy
 from bpy_types import Operator
 from bpy.props import BoolProperty, EnumProperty, FloatProperty, FloatVectorProperty
-from . import sampling
+from . import sampling, data_links
 
 
 class AddObservatorySettingsNodeGroupOperator(bpy.types.Operator):
@@ -46,7 +46,7 @@ class ComputeSamplingImageOperator(bpy.types.Operator):
     bl_label = "Compute Sampling Image"
 
     def find_antennas(self, context):
-        coll = bpy.data.collections.get("Observatory")
+        coll = data_links.get_antenna_collection()
         if coll is None:
             self.report({'ERROR'}, "Could not find collection 'Observatory' for computing base lines")
             return

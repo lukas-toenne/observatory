@@ -41,12 +41,13 @@ bl_info = {
 if "bpy" in locals():
     import importlib
 
-    from . import coordinates, convolution, operator, props, sampling, ui
+    from . import coordinates, convolution, data_links, operator, props, sampling, ui
     importlib.reload(coordinates)
     importlib.reload(convolution)
     importlib.reload(props)
     importlib.reload(operator)
     importlib.reload(sampling)
+    importlib.reload(data_links)
     importlib.reload(ui)
 
 import bpy

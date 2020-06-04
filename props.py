@@ -27,12 +27,11 @@
 import bpy
 from bpy.props import BoolProperty, EnumProperty, FloatProperty, FloatVectorProperty, IntProperty, PointerProperty, StringProperty
 from bpy.types import PropertyGroup
-from bpy_types import RNAMetaPropGroup
 from bpy.app.handlers import persistent
 from math import *
-from typing import get_type_hints
 import time
-from .coordinates import *
+from .coordinates import MakeCelestialCoordinate, horizontal_to_equatorial, equatorial_to_horizontal
+from . import data_links
 
 
 # Speed of light
@@ -49,8 +48,8 @@ sky_background_items = [
 ]
 
 
-def update_property_group(self, context):
-    self.id_data.observatory.update_generic(context)
+def update_generic(data, context):
+    data_links.update_nodegroup(data.id_data, context)
 
 def MakeGridSettings(def_enabled=False, def_color=(0.8, 0.8, 0.8)):
     class GridSettings(PropertyGroup):
@@ -58,7 +57,7 @@ def MakeGridSettings(def_enabled=False, def_color=(0.8, 0.8, 0.8)):
             name="Show Grid",
             description="Enable background grid display",
             default=def_enabled,
-            update=update_property_group,
+            update=update_generic,
             )
 
         color : FloatVectorProperty(
@@ -67,7 +66,7 @@ def MakeGridSettings(def_enabled=False, def_color=(0.8, 0.8, 0.8)):
             subtype='COLOR',
             size=3,
             default=def_color,
-            update=update_property_group,
+            update=update_generic,
             )
 
         def draw(self, context, layout, label):
@@ -88,7 +87,7 @@ class TimeProp(PropertyGroup):
         name="Day",
         description="Day since the J2000 epoch",
         default=7305,
-        update=update_property_group,
+        update=update_generic,
         )
 
     hour : FloatProperty(
@@ -97,7 +96,7 @@ class TimeProp(PropertyGroup):
         default=12.0,
         min=0.0,
         max=24.0,
-        update=update_property_group,
+        update=update_generic,
         )
 
     def get_earth_rotation(self):
@@ -119,23 +118,14 @@ class TimeProp(PropertyGroup):
         col.prop(self, "day")
         col.prop(self, "hour")
 
-ObservatoryLocation = MakeCelestialCoordinate(update=update_property_group)
-TargetCoordinate = MakeCelestialCoordinate(default=(0.0, pi/2), update=update_property_group)
+ObservatoryLocation = MakeCelestialCoordinate(update=update_generic)
+TargetCoordinate = MakeCelestialCoordinate(default=(0.0, pi/2), update=update_generic)
 HorizontalGridSettings = MakeGridSettings(def_enabled=False, def_color=(0.309342, 0.186442, 0.012358))
 EquatorialGridSettings = MakeGridSettings(def_enabled=True, def_color=(0.009179, 0.459465, 0.8))
 EclipticGridSettings = MakeGridSettings(def_enabled=False, def_color=(0.004964, 0.137349, 0.002201))
 GalacticGridSettings = MakeGridSettings(def_enabled=False, def_color=(0.233609, 0.010037, 0.228179))
 
-def get_nodegroup(create=False):
-    nodegroup = bpy.data.node_groups.get("ObservatorySettings")
-    if create and nodegroup is None:
-        nodegroup = bpy.data.node_groups.new("ObservatorySettings", 'ShaderNodeTree')
-    return nodegroup
-
 class ObservatorySettings(bpy.types.PropertyGroup):
-    def update_generic(self, context):
-        self.update_nodegroup(context)
-
     location : PointerProperty(type=ObservatoryLocation)
 
     time : PointerProperty(type=TimeProp)
@@ -164,33 +154,6 @@ class ObservatorySettings(bpy.types.PropertyGroup):
         self.ecliptic_grid.draw(context, layout, "Ecliptic Grid")
         self.galactic_grid.draw(context, layout, "Galactic Grid")
 
-    def update_nodegroup(self, context):
-        nodegroup = get_nodegroup()
-        if nodegroup is None:
-            return
-        node = next((n for n in nodegroup.nodes if n.type=='GROUP_OUTPUT'), None)
-        if node is None:
-            node = nodegroup.nodes.new("NodeGroupOutput")
-
-        def ensure_output(prop, value, type):
-            output = nodegroup.outputs.get(prop)
-            if output is None:
-                output = nodegroup.outputs.new(type, prop)
-            socket = next(s for s in node.inputs if s.identifier==output.identifier)
-            socket.default_value = value
-
-        ensure_output("Location Longitude", self.location.longitude, "NodeSocketFloat")
-        ensure_output("Location Latitude", self.location.latitude, "NodeSocketFloat")
-        ensure_output("Sky Background", self.bl_rna.properties["sky_background"].enum_items[self.sky_background].value, "NodeSocketFloat")
-
-        def ensure_grid_outputs(grid, name):
-            ensure_output("{} Enabled".format(name), grid.enabled, "NodeSocketFloat")
-            ensure_output("{} Color".format(name), (*grid.color[:3], 1.0), "NodeSocketColor")
-        ensure_grid_outputs(self.horizontal_grid, "Horizontal Grid")
-        ensure_grid_outputs(self.equatorial_grid, "Equatorial Grid")
-        ensure_grid_outputs(self.ecliptic_grid, "Ecliptic Grid")
-        ensure_grid_outputs(self.galactic_grid, "Galactic Grid")
-
 
 sampling_id = "ObservatorySampling"
 pointspread_id = "PointSpread"
@@ -216,6 +179,7 @@ class InterferometrySettings(bpy.types.PropertyGroup):
         subtype='EULER',
         unit='ROTATION',
         get=get_target_horizontal,
+        update=update_generic,
         )
 
     frequency : FloatProperty(
@@ -225,6 +189,7 @@ class InterferometrySettings(bpy.types.PropertyGroup):
         min=0.0,
         soft_min=10e6,
         soft_max=1e12,
+        update=update_generic,
         )
 
     def get_frequency_mhz(self):
@@ -268,6 +233,35 @@ class InterferometrySettings(bpy.types.PropertyGroup):
         default=128,
         )
 
+    auto_generate_depsgraph_handler = data_links.DepsgraphListener()
+
+    def contains_image_dependency(self, updates):
+        antennas = data_links.get_antenna_collection()
+        objects = set(antennas.objects)
+        for u in updates:
+            id_data = u.id.original
+            if id_data is antennas:
+                return True
+            if isinstance(id_data, bpy.types.Object):
+                if id_data in objects:
+                    return True
+        return False
+
+    def generate_images(self):
+        print("HELLO!")
+
+    def update_auto_generate_images(self, context):
+        if self.auto_generate_images:
+            self.auto_generate_depsgraph_handler.enable(self.contains_image_dependency, self.generate_images)
+        else:
+            self.auto_generate_depsgraph_handler.disable()
+    auto_generate_images : BoolProperty(
+        name="Use Auto Update",
+        description="Automatically update images when the scene changes",
+        default=False,
+        update=update_auto_generate_images
+        )
+
     def draw(self, context, layout):
         self.target.draw_long_lat(context, layout, label="Target")
 
@@ -278,32 +272,18 @@ class InterferometrySettings(bpy.types.PropertyGroup):
         row = layout.row(align=True)
         row.prop(self, "image_width", text="")
         row.prop(self, "image_height", text="")
+        layout.prop(self, "auto_generate_images")
 
         layout.separator()
         layout.operator("observatory.compute_sampling_image")
 
         for image_id in all_image_ids:
-            img, data, prop = self.get_image_data_prop(image_id)
+            img, data, prop = data_links.get_image_data_prop(image_id)
             if data:
                 layout.template_ID_preview(data, prop)
 
-    def get_image_data_prop(self, name, create=False):
-        img = bpy.data.images.get(name)
-        if create and img is None:
-            # img = bpy.data.images.new(name, self.image_width, self.image_height, float_buffer=True, is_data=True)
-            img = bpy.data.images.new(name, self.image_width, self.image_height)
-            img.use_fake_user = True
-
-        nodegroup = get_nodegroup(create=create)
-        data = nodegroup.nodes.get(name)
-        if create and data is None:
-            data = nodegroup.nodes.new("ShaderNodeTexImage")
-            data.name = name
-            data.image = img
-        return img, data, "image"
-
     def get_image(self, name, create=False):
-        img, data, prop = self.get_image_data_prop(name, create=create)
+        img, data, prop = data_links.get_image_data_prop(name, create=create, width=self.image_width, height=self.image_height)
         return img
 
     def get_sampling_image(self, create=False):
@@ -322,10 +302,12 @@ class InterferometrySettings(bpy.types.PropertyGroup):
         return self.get_image(cleanbeam_id, create=create)
 
 
-# @persistent
-# def load_handler(dummy):
-#     bpy.app.driver_namespace['horizontal_to_equatorial'] = horizontal_to_equatorial
-#     bpy.app.driver_namespace['equatorial_to_horizontal'] = equatorial_to_horizontal
+@persistent
+def load_handler(dummy):
+    print("load_handler")
+    # Fix update handlers after loading
+    for world in bpy.data.worlds:
+        world.interferometry.update_auto_generate_images(bpy.context)
 
 def register():
     bpy.utils.register_class(ObservatoryLocation)
@@ -341,8 +323,7 @@ def register():
     bpy.types.World.observatory = PointerProperty(type=ObservatorySettings)
     bpy.types.World.interferometry = PointerProperty(type=InterferometrySettings)
 
-    # load_handler(None)
-    # bpy.app.handlers.load_post.append(load_handler)
+    bpy.app.handlers.load_post.append(load_handler)
 
 def unregister():
     del bpy.types.World.observatory
@@ -358,6 +339,4 @@ def unregister():
     bpy.utils.unregister_class(ObservatorySettings)
     bpy.utils.unregister_class(InterferometrySettings)
 
-    # bpy.app.handlers.load_post.remove(load_handler)
-    # del bpy.app.driver_namespace['horizontal_to_equatorial']
-    # del bpy.app.driver_namespace['equatorial_to_horizontal']
+    bpy.app.handlers.load_post.remove(load_handler)

@@ -88,9 +88,6 @@ def compute_sampling_image(world, antennas):
 
 
     # Construct sampling from baselines
-    # w2 = w // 2
-    # h2 = h // 2
-    # sampling = np.zeros((2*w2 + 1, 2*h2 + 1), dtype=np.float32)
     # For real-valued output the input is complex conjugate
     # and irfft expects only the positive components.
     sampling = np.zeros((w + 1, h*2 + 1), dtype=np.float32)
@@ -106,10 +103,7 @@ def compute_sampling_image(world, antennas):
                 sampling[int(0.5 + s.x), int(h/2 + 0.5 - s.y)] = 1.0
 
     # Compute point spread function
-    # sampling = fft.ifftshift(sampling)
     pointspread = fft.irfft2(sampling, s=(w, h), norm="ortho")
-    # pointspread_r = pointspread[0::1, 0::2]
-    print(sampling.shape, pointspread.shape, pointspread.dtype)
 
     sampling_image = world.interferometry.get_sampling_image(create=True)
     ndarray_to_image(sampling, sampling_image, allow_resize=True)
