@@ -193,6 +193,11 @@ class ObservatorySettings(bpy.types.PropertyGroup):
 
 
 sampling_id = "ObservatorySampling"
+pointspread_id = "PointSpread"
+trueimage_id = "TrueImage"
+dirtybeam_id = "DirtyBeam"
+cleanbeam_id = "CleanBeam"
+all_image_ids = [sampling_id, pointspread_id, trueimage_id, dirtybeam_id, cleanbeam_id]
 default_frequency = 1.428e9
 
 class InterferometrySettings(bpy.types.PropertyGroup):
@@ -276,9 +281,11 @@ class InterferometrySettings(bpy.types.PropertyGroup):
 
         layout.separator()
         layout.operator("observatory.compute_sampling_image")
-        img, data, prop = self.get_image_data_prop(sampling_id)
-        if data:
-            layout.template_ID_preview(data, prop)
+
+        for image_id in all_image_ids:
+            img, data, prop = self.get_image_data_prop(image_id)
+            if data:
+                layout.template_ID_preview(data, prop)
 
     def get_image_data_prop(self, name, create=False):
         img = bpy.data.images.get(name)
@@ -301,6 +308,18 @@ class InterferometrySettings(bpy.types.PropertyGroup):
 
     def get_sampling_image(self, create=False):
         return self.get_image(sampling_id, create=create)
+
+    def get_pointspread_image(self, create=False):
+        return self.get_image(pointspread_id, create=create)
+
+    def get_trueimage_image(self, create=False):
+        return self.get_image(trueimage_id, create=create)
+
+    def get_dirtybeam_image(self, create=False):
+        return self.get_image(dirtybeam_id, create=create)
+
+    def get_cleanbeam_image(self, create=False):
+        return self.get_image(cleanbeam_id, create=create)
 
 
 # @persistent

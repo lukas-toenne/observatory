@@ -60,7 +60,6 @@ class ComputeSamplingImageOperator(bpy.types.Operator):
         if antennas is None:
             return {'CANCELLED'}
 
-        img = world.interferometry.get_sampling_image(create=True)
         if sampling.compute_sampling_image(world, antennas):
             return {'FINISHED'}
 
