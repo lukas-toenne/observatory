@@ -233,8 +233,6 @@ class InterferometrySettings(bpy.types.PropertyGroup):
         default=128,
         )
 
-    auto_generate_depsgraph_handler = data_links.DepsgraphListener()
-
     def contains_image_dependency(self, updates):
         antennas = data_links.get_antenna_collection()
         objects = set(antennas.objects)
@@ -250,16 +248,10 @@ class InterferometrySettings(bpy.types.PropertyGroup):
     def generate_images(self):
         print("HELLO!")
 
-    def update_auto_generate_images(self, context):
-        if self.auto_generate_images:
-            self.auto_generate_depsgraph_handler.enable(self.contains_image_dependency, self.generate_images)
-        else:
-            self.auto_generate_depsgraph_handler.disable()
     auto_generate_images : BoolProperty(
         name="Use Auto Update",
         description="Automatically update images when the scene changes",
         default=False,
-        update=update_auto_generate_images
         )
 
     def draw(self, context, layout):
@@ -303,11 +295,19 @@ class InterferometrySettings(bpy.types.PropertyGroup):
 
 
 @persistent
-def load_handler(dummy):
-    print("load_handler")
-    # Fix update handlers after loading
-    for world in bpy.data.worlds:
-        world.interferometry.update_auto_generate_images(bpy.context)
+def depsgraph_handler_pre(scene):
+    world = scene.world
+    if world.interferometry.auto_generate_images:
+        # Warning: cannot use the evaluated depsgraph from context, this causes infinite loops!
+        depsgraph = bpy.context.window.view_layer.depsgraph
+        world.interferometry["images_updated"] = world.interferometry.contains_image_dependency(depsgraph.updates)
+
+@persistent
+def depsgraph_handler_post(scene):
+    world = scene.world
+    if world.interferometry.auto_generate_images:
+        if world.interferometry.get("images_updated", False):
+            world.interferometry.generate_images()
 
 def register():
     bpy.utils.register_class(ObservatoryLocation)
@@ -323,7 +323,8 @@ def register():
     bpy.types.World.observatory = PointerProperty(type=ObservatorySettings)
     bpy.types.World.interferometry = PointerProperty(type=InterferometrySettings)
 
-    bpy.app.handlers.load_post.append(load_handler)
+    bpy.app.handlers.depsgraph_update_pre.append(depsgraph_handler_pre)
+    bpy.app.handlers.depsgraph_update_post.append(depsgraph_handler_post)
 
 def unregister():
     del bpy.types.World.observatory
@@ -339,4 +340,5 @@ def unregister():
     bpy.utils.unregister_class(ObservatorySettings)
     bpy.utils.unregister_class(InterferometrySettings)
 
-    bpy.app.handlers.load_post.remove(load_handler)
+    bpy.app.handlers.depsgraph_update_pre.remove(depsgraph_handler_pre)
+    bpy.app.handlers.depsgraph_update_post.remove(depsgraph_handler_post)
