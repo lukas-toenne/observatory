@@ -45,18 +45,10 @@ class ComputeSamplingImageOperator(bpy.types.Operator):
     bl_idname = "observatory.compute_sampling_image"
     bl_label = "Compute Sampling Image"
 
-    def find_antennas(self, context):
-        coll = data_links.get_antenna_collection()
-        if coll is None:
-            self.report({'ERROR'}, "Could not find collection 'Observatory' for computing base lines")
-            return
-        depsgraph = context.evaluated_depsgraph_get()
-        return [obj.evaluated_get(depsgraph).matrix_world.to_translation() for obj in coll.objects]
-
     def execute(self, context):
         world = context.world
 
-        antennas = self.find_antennas(context)
+        antennas = data_links.find_antennas(context, op=self)
         if antennas is None:
             return {'CANCELLED'}
 

@@ -82,3 +82,12 @@ def get_image_data_prop(name, create=False, width=128, height=128):
 
 def get_antenna_collection():
     return bpy.data.collections.get("Observatory")
+
+def find_antennas(context, op=None):
+    coll = get_antenna_collection()
+    if coll is None:
+        if op:
+            op.report({'ERROR'}, "Could not find collection 'Observatory' for computing base lines")
+        return
+    depsgraph = context.evaluated_depsgraph_get()
+    return [obj.evaluated_get(depsgraph).matrix_world.to_translation() for obj in coll.objects]

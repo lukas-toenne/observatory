@@ -31,7 +31,7 @@ from bpy.app.handlers import persistent
 from math import *
 import time
 from .coordinates import MakeCelestialCoordinate, horizontal_to_equatorial, equatorial_to_horizontal
-from . import data_links
+from . import data_links, sampling
 
 
 # Speed of light
@@ -246,7 +246,10 @@ class InterferometrySettings(bpy.types.PropertyGroup):
         return False
 
     def generate_images(self):
-        print("HELLO!")
+        antennas = data_links.find_antennas(bpy.context)
+        if antennas is None:
+            return
+        sampling.compute_sampling_image(self.id_data, antennas)
 
     auto_generate_images : BoolProperty(
         name="Use Auto Update",
