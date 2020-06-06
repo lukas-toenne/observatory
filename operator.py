@@ -36,7 +36,7 @@ class AddObservatorySettingsNodeGroupOperator(bpy.types.Operator):
     bl_label = "Add Observatory Settings Node Group"
 
     def execute(self, context):
-        nodegroup = context.world.observatory.get_nodegroup(create=True)
+        nodegroup = data_links.get_nodegroup(create=True)
         return {'FINISHED'}
 
 
@@ -81,16 +81,16 @@ class ComputeSamplingImageOperator(bpy.types.Operator):
     bl_label = "Compute Sampling Image"
 
     def execute(self, context):
-        world = context.world
+        scene = context.scene
 
         antennas = data_links.find_antennas(context, op=self)
         if antennas is None:
             return {'CANCELLED'}
 
-        if not sampling.compute_sampling_image(world, antennas):
+        if not sampling.compute_sampling_image(scene, antennas):
             return {'CANCELLED'}
 
-        sampling.execute_all_image_pixel_updates(world)
+        sampling.execute_all_image_pixel_updates(scene)
 
         return {'FINISHED'}
 

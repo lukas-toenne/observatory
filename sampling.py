@@ -58,7 +58,7 @@ def update_image_pixels(image, pixels, width, height, allow_resize=False):
 
 """
 Create image pixel update job.
-get_image is a callable that takes a world argument and returns an image datablock or None.
+get_image is a callable that takes a scene argument and returns an image datablock or None.
 pixels is raw RGBA pixel data that can be written to the image datablock.
 width and height are new image size values, only used if allow_resize is set to True.
 """
@@ -70,8 +70,8 @@ def enqueue_image_pixel_update(q, get_image, pixels, width, height, allow_resize
         except queue.Empty:
             break
 
-    def job(world):
-        image = get_image(world)
+    def job(scene):
+        image = get_image(scene)
         if image is not None:
             update_image_pixels(image, pixels, width, height, allow_resize)
 
@@ -84,19 +84,19 @@ def enqueue_image_pixel_update(q, get_image, pixels, width, height, allow_resize
 Check if image pixel update is available and execute it.
 Returns True if image pixel data was updated.
 """
-def execute_image_pixel_update(q, world):
+def execute_image_pixel_update(q, scene):
     while not q.empty():
         try:
             job = q.get_nowait()
-            job(world)
+            job(scene)
             return True
         except queue.Empty:
             return False
     return False
 
-def execute_all_image_pixel_updates(world):
-    execute_image_pixel_update(sampling_queue, world)
-    execute_image_pixel_update(pointspread_queue, world)
+def execute_all_image_pixel_updates(scene):
+    execute_image_pixel_update(sampling_queue, scene)
+    execute_image_pixel_update(pointspread_queue, scene)
 
 """
 Convert data array into image pixels.
@@ -111,11 +111,11 @@ def ndarray_to_pixels(array, mapping=(0.0, 1.0)):
     imgdata = np.dstack((values, values, values, np.ones(values.shape)))
     return imgdata.flatten().tolist()
 
-def compute_sampling_image(world, antennas):
+def compute_sampling_image(scene, antennas):
     if len(antennas) < 2:
         return False
-    w = world.interferometry.image_width
-    h = world.interferometry.image_height
+    w = scene.interferometry.image_width
+    h = scene.interferometry.image_height
     if w < 1 or h < 1:
         return False
 
@@ -162,7 +162,7 @@ def compute_sampling_image(world, antennas):
 
     enqueue_image_pixel_update(
         sampling_queue,
-        get_image=lambda world: world.interferometry.get_sampling_image(create=True),
+        get_image=lambda scene: scene.interferometry.get_sampling_image(create=True),
         pixels=ndarray_to_pixels(sampling),
         width=sampling.shape[0],
         height=sampling.shape[1],
@@ -170,7 +170,7 @@ def compute_sampling_image(world, antennas):
         )
     enqueue_image_pixel_update(
         pointspread_queue,
-        get_image=lambda world: world.interferometry.get_pointspread_image(create=True),
+        get_image=lambda scene: scene.interferometry.get_pointspread_image(create=True),
         pixels=ndarray_to_pixels(pointspread, mapping=(0.0, 0.1)),
         width=pointspread.shape[0],
         height=pointspread.shape[1],

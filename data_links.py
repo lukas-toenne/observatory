@@ -34,9 +34,9 @@ def get_nodegroup(create=False):
         nodegroup = bpy.data.node_groups.new("ObservatorySettings", 'ShaderNodeTree')
     return nodegroup
 
-def update_nodegroup(world, context):
-    observatory = world.observatory
-    interferometry = world.interferometry
+def update_nodegroup(scene, context):
+    observatory = scene.observatory
+    interferometry = scene.interferometry
 
     nodegroup = get_nodegroup()
     if nodegroup is None:

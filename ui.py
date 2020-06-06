@@ -29,11 +29,11 @@ from bpy.props import BoolProperty, EnumProperty, FloatProperty, FloatVectorProp
 
 
 class ObservatoryPanel(bpy.types.Panel):
-    bl_idname = "WORLD_PT_observatory"
+    bl_idname = "SCENE_PT_observatory"
     bl_label = "Observatory"
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
-    bl_context = "world"
+    bl_context = "scene"
 
     @classmethod
     def poll(cls, context):
@@ -41,15 +41,15 @@ class ObservatoryPanel(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-        context.world.observatory.draw(context, layout)
+        context.scene.observatory.draw(context, layout)
 
 
 class InterferometryPanel(bpy.types.Panel):
-    bl_idname = "WORLD_PT_interferometry"
+    bl_idname = "SCENE_PT_interferometry"
     bl_label = "Interferometry"
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
-    bl_context = "world"
+    bl_context = "scene"
 
     @classmethod
     def poll(cls, context):
@@ -57,7 +57,7 @@ class InterferometryPanel(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-        context.world.interferometry.draw(context, layout)
+        context.scene.interferometry.draw(context, layout)
 
 
 def register():

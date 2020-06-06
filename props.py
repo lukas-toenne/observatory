@@ -169,12 +169,12 @@ default_frequency = 1.428e9
 """
 Timer callback for automatically computing images.
 """
-def update_images_timer(world):
-    if not world.interferometry.auto_generate_images:
+def update_images_timer(scene):
+    if not scene.interferometry.auto_generate_images:
         # Unregister the timer function
         return None
-    sampling.execute_all_image_pixel_updates(world)
-    return world.interferometry.auto_generate_images_interval
+    sampling.execute_all_image_pixel_updates(scene)
+    return scene.interferometry.auto_generate_images_interval
 
 class InterferometrySettings(bpy.types.PropertyGroup):
     @property
@@ -268,7 +268,7 @@ class InterferometrySettings(bpy.types.PropertyGroup):
         if self.auto_generate_images:
             # Note: The function unregisters itself by returning None when auto_generate_images is set False.
             # Storing a reference to the function for explicit unregistering is not reliable within bpy objects.
-            bpy.app.timers.register(partial(update_images_timer, world=self.id_data))
+            bpy.app.timers.register(partial(update_images_timer, scene=self.id_data))
 
     auto_generate_images : BoolProperty(
         name="Use Auto Update",
@@ -335,23 +335,21 @@ class InterferometrySettings(bpy.types.PropertyGroup):
 @persistent
 def load_handler(dummy):
     # Restart timers where needed
-    for world in bpy.data.worlds:
-        world.interferometry.auto_generate_images_update(bpy.context)
+    for scene in bpy.data.scenes:
+        scene.interferometry.auto_generate_images_update(bpy.context)
 
 @persistent
 def depsgraph_handler_pre(scene):
-    world = scene.world
-    if world.interferometry.auto_generate_images:
+    if scene.interferometry.auto_generate_images:
         # Warning: cannot use the evaluated depsgraph from context, this causes infinite loops!
         depsgraph = bpy.context.window.view_layer.depsgraph
-        world.interferometry["images_updated"] = world.interferometry.contains_image_dependency(depsgraph.updates)
+        scene.interferometry["images_updated"] = scene.interferometry.contains_image_dependency(depsgraph.updates)
 
 @persistent
 def depsgraph_handler_post(scene):
-    world = scene.world
-    if world.interferometry.auto_generate_images:
-        if world.interferometry.get("images_updated", False):
-            world.interferometry.generate_images()
+    if scene.interferometry.auto_generate_images:
+        if scene.interferometry.get("images_updated", False):
+            scene.interferometry.generate_images()
 
 def register():
     bpy.utils.register_class(ObservatoryLocation)
@@ -364,16 +362,16 @@ def register():
     bpy.utils.register_class(ObservatorySettings)
     bpy.utils.register_class(InterferometrySettings)
 
-    bpy.types.World.observatory = PointerProperty(type=ObservatorySettings)
-    bpy.types.World.interferometry = PointerProperty(type=InterferometrySettings)
+    bpy.types.Scene.observatory = PointerProperty(type=ObservatorySettings)
+    bpy.types.Scene.interferometry = PointerProperty(type=InterferometrySettings)
 
     bpy.app.handlers.load_post.append(load_handler)
     bpy.app.handlers.depsgraph_update_pre.append(depsgraph_handler_pre)
     bpy.app.handlers.depsgraph_update_post.append(depsgraph_handler_post)
 
 def unregister():
-    del bpy.types.World.observatory
-    del bpy.types.World.interferometry
+    del bpy.types.Scene.observatory
+    del bpy.types.Scene.interferometry
 
     bpy.utils.unregister_class(ObservatoryLocation)
     bpy.utils.unregister_class(TargetCoordinate)
