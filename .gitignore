@@ -127,3 +127,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+
+# Blender addon assets
+blendfiles/SkyMap/SkyMap.tif

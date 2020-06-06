@@ -40,6 +40,41 @@ class AddObservatorySettingsNodeGroupOperator(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class DownloadSkyMapTexturesOperator(bpy.types.Operator):
+    """Download textures for the sky map"""
+    bl_idname = "observatory.download_skymap_textures"
+    bl_label = "Download Sky Map Textures"
+
+    @classmethod
+    def poll(cls, context):
+        image = bpy.data.images.get("SkyMap.tif")
+        if image is None:
+            return False
+        if image.source != 'FILE':
+            return False
+        return not image.has_data
+
+    def execute(self, context):
+        import os.path
+        import urllib.request
+
+        world = context.world
+        if world.library is None:
+            dirpath = bpy.path.abspath("//blendfiles/SkyMap/SkyMap.tif")
+        else:
+            dirpath = os.path.dirname(bpy.path.abspath(world.library.filepath))
+        filepath = os.path.join(dirpath, "SkyMap.tif")
+        print("File path: ", filepath)
+
+        url = 'https://svs.gsfc.nasa.gov/vis/a000000/a003500/a003572/TychoSkymapII.t3_04096x02048.tif'
+        urllib.request.urlretrieve(url, filepath)
+
+        image = bpy.data.images.get("SkyMap.tif")
+        image.reload()
+        image.update()
+        return {'FINISHED'}
+
+
 class ComputeSamplingImageOperator(bpy.types.Operator):
     """Compute the sampling image based on antenna configuration"""
     bl_idname = "observatory.compute_sampling_image"
@@ -62,8 +97,10 @@ class ComputeSamplingImageOperator(bpy.types.Operator):
 
 def register():
     bpy.utils.register_class(AddObservatorySettingsNodeGroupOperator)
+    bpy.utils.register_class(DownloadSkyMapTexturesOperator)
     bpy.utils.register_class(ComputeSamplingImageOperator)
 
 def unregister():
     bpy.utils.unregister_class(AddObservatorySettingsNodeGroupOperator)
+    bpy.utils.unregister_class(DownloadSkyMapTexturesOperator)
     bpy.utils.unregister_class(ComputeSamplingImageOperator)

@@ -146,6 +146,8 @@ class ObservatorySettings(bpy.types.PropertyGroup):
 
     def draw(self, context, layout):
         layout.prop(self, "sky_background")
+        if bpy.ops.observatory.download_skymap_textures.poll():
+            layout.operator("observatory.download_skymap_textures")
 
         self.location.draw_long_lat(context, layout)
         self.time.draw(context, layout)
