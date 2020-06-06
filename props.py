@@ -32,6 +32,7 @@ from math import *
 import time
 from .coordinates import MakeCelestialCoordinate, horizontal_to_equatorial, equatorial_to_horizontal
 from . import data_links, sampling
+from functools import partial
 
 
 # Speed of light
@@ -163,6 +164,16 @@ cleanbeam_id = "CleanBeam"
 all_image_ids = [sampling_id, pointspread_id, trueimage_id, dirtybeam_id, cleanbeam_id]
 default_frequency = 1.428e9
 
+"""
+Timer callback for automatically computing images.
+"""
+def update_images_timer(world):
+    if not world.interferometry.auto_generate_images:
+        # Unregister the timer function
+        return None
+    sampling.execute_all_image_pixel_updates(world)
+    return world.interferometry.auto_generate_images_interval
+
 class InterferometrySettings(bpy.types.PropertyGroup):
     @property
     def observatory(self):
@@ -251,10 +262,27 @@ class InterferometrySettings(bpy.types.PropertyGroup):
             return
         sampling.compute_sampling_image(self.id_data, antennas)
 
+    def auto_generate_images_update(self, context):
+        if self.auto_generate_images:
+            # Note: The function unregisters itself by returning None when auto_generate_images is set False.
+            # Storing a reference to the function for explicit unregistering is not reliable within bpy objects.
+            bpy.app.timers.register(partial(update_images_timer, world=self.id_data))
+
     auto_generate_images : BoolProperty(
         name="Use Auto Update",
         description="Automatically update images when the scene changes",
         default=False,
+        update=auto_generate_images_update,
+        )
+
+    auto_generate_images_interval : FloatProperty(
+        name="Auto Update Interval",
+        description="Interval for automatic image updates",
+        default=1.0,
+        min=0.0,
+        soft_min=0.1,
+        soft_max=5.0,
+        update=auto_generate_images_update,
         )
 
     def draw(self, context, layout):
@@ -267,7 +295,12 @@ class InterferometrySettings(bpy.types.PropertyGroup):
         row = layout.row(align=True)
         row.prop(self, "image_width", text="")
         row.prop(self, "image_height", text="")
-        layout.prop(self, "auto_generate_images")
+
+        row = layout.row(align=True)
+        row.prop(self, "auto_generate_images", text="Auto Update")
+        row2 = row.row(align=True)
+        row2.enabled = self.auto_generate_images
+        row2.prop(self, "auto_generate_images_interval", text="Interval")
 
         layout.separator()
         layout.operator("observatory.compute_sampling_image")
@@ -298,6 +331,12 @@ class InterferometrySettings(bpy.types.PropertyGroup):
 
 
 @persistent
+def load_handler(dummy):
+    # Restart timers where needed
+    for world in bpy.data.worlds:
+        world.interferometry.auto_generate_images_update(bpy.context)
+
+@persistent
 def depsgraph_handler_pre(scene):
     world = scene.world
     if world.interferometry.auto_generate_images:
@@ -326,6 +365,7 @@ def register():
     bpy.types.World.observatory = PointerProperty(type=ObservatorySettings)
     bpy.types.World.interferometry = PointerProperty(type=InterferometrySettings)
 
+    bpy.app.handlers.load_post.append(load_handler)
     bpy.app.handlers.depsgraph_update_pre.append(depsgraph_handler_pre)
     bpy.app.handlers.depsgraph_update_post.append(depsgraph_handler_post)
 
@@ -343,5 +383,6 @@ def unregister():
     bpy.utils.unregister_class(ObservatorySettings)
     bpy.utils.unregister_class(InterferometrySettings)
 
+    bpy.app.handlers.load_post.remove(load_handler)
     bpy.app.handlers.depsgraph_update_pre.remove(depsgraph_handler_pre)
     bpy.app.handlers.depsgraph_update_post.remove(depsgraph_handler_post)

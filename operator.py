@@ -52,10 +52,12 @@ class ComputeSamplingImageOperator(bpy.types.Operator):
         if antennas is None:
             return {'CANCELLED'}
 
-        if sampling.compute_sampling_image(world, antennas):
-            return {'FINISHED'}
+        if not sampling.compute_sampling_image(world, antennas):
+            return {'CANCELLED'}
 
-        return {'CANCELLED'}
+        sampling.execute_all_image_pixel_updates(world)
+
+        return {'FINISHED'}
 
 
 def register():

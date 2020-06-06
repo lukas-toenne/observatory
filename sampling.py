@@ -28,33 +28,88 @@ from mathutils import Vector, Quaternion, Euler, Matrix
 from math import *
 import numpy as np
 from numpy import fft as fft
+import queue
+
+# Queues for updated image pixel data
+sampling_queue = queue.Queue(maxsize=1)
+pointspread_queue = queue.Queue(maxsize=1)
 
 margin = 3
 
-"""Convert data array into image pixels."""
-def ndarray_to_image(array, image, allow_resize=False):
+"""
+Write pixel data into image data block.
+WARNING: This should only be done on the main thread using the sampling queue!
+"""
+def update_image_pixels(image, pixels, width, height, allow_resize=False):
+    if allow_resize:
+        if image.source != 'GENERATED':
+            image.source = 'GENERATED'
+        if image.generated_width != width:
+            image.generated_width = width
+        if image.generated_height != height:
+            image.generated_height = height
+    else:
+        assert(image.source == 'GENERATED')
+        assert(image.size[0] == width)
+        assert(image.size[1] == height)
+
+    image.pixels = pixels
+    image.preview.reload()
+
+"""
+Create image pixel update job.
+get_image is a callable that takes a world argument and returns an image datablock or None.
+pixels is raw RGBA pixel data that can be written to the image datablock.
+width and height are new image size values, only used if allow_resize is set to True.
+"""
+def enqueue_image_pixel_update(q, get_image, pixels, width, height, allow_resize=False):
+    # Clear queue
+    while not q.empty():
+        try:
+            q.get_nowait()
+        except queue.Empty:
+            break
+
+    def job(world):
+        image = get_image(world)
+        if image is not None:
+            update_image_pixels(image, pixels, width, height, allow_resize)
+
+    try:
+        q.put_nowait(job)
+    except queue.Full:
+        pass
+
+"""
+Check if image pixel update is available and execute it.
+Returns True if image pixel data was updated.
+"""
+def execute_image_pixel_update(q, world):
+    while not q.empty():
+        try:
+            job = q.get_nowait()
+            job(world)
+            return True
+        except queue.Empty:
+            return False
+    return False
+
+def execute_all_image_pixel_updates(world):
+    execute_image_pixel_update(sampling_queue, world)
+    execute_image_pixel_update(pointspread_queue, world)
+
+"""
+Convert data array into image pixels.
+"""
+def ndarray_to_pixels(array, mapping=(0.0, 1.0)):
     assert(len(array.shape) == 2)
 
     w = array.shape[0]
     h = array.shape[1]
-    if allow_resize:
-        if image.source != 'GENERATED':
-            image.source = 'GENERATED'
-        if image.generated_width != w:
-            image.generated_width = w
-        if image.generated_height != h:
-            image.generated_height = h
-    else:
-        assert(image.source == 'GENERATED')
-        assert(image.size[0] == w)
-        assert(image.size[1] == h)
-
-    values = (array * 0.5 + 0.5).astype(np.float32)
+    values = np.clip(array / (mapping[1] - mapping[0]) - mapping[0], mapping[0], mapping[1]).astype(np.float32)
 
     imgdata = np.dstack((values, values, values, np.ones(values.shape)))
-    image.pixels = imgdata.flatten().tolist()
-    image.preview.reload()
-
+    return imgdata.flatten().tolist()
 
 def compute_sampling_image(world, antennas):
     if len(antennas) < 2:
@@ -105,9 +160,21 @@ def compute_sampling_image(world, antennas):
     # Compute point spread function
     pointspread = fft.irfft2(sampling, s=(w, h), norm="ortho")
 
-    sampling_image = world.interferometry.get_sampling_image(create=True)
-    ndarray_to_image(sampling, sampling_image, allow_resize=True)
-    pointspread_image = world.interferometry.get_pointspread_image(create=True)
-    ndarray_to_image(pointspread * 10.0, pointspread_image, allow_resize=True)
+    enqueue_image_pixel_update(
+        sampling_queue,
+        get_image=lambda world: world.interferometry.get_sampling_image(create=True),
+        pixels=ndarray_to_pixels(sampling),
+        width=sampling.shape[0],
+        height=sampling.shape[1],
+        allow_resize=True,
+        )
+    enqueue_image_pixel_update(
+        pointspread_queue,
+        get_image=lambda world: world.interferometry.get_pointspread_image(create=True),
+        pixels=ndarray_to_pixels(pointspread, mapping=(0.0, 0.1)),
+        width=pointspread.shape[0],
+        height=pointspread.shape[1],
+        allow_resize=True,
+        )
 
     return True
