@@ -49,11 +49,14 @@ def update_nodegroup(scene, context):
         output = nodegroup.outputs.get(prop)
         if output is None:
             output = nodegroup.outputs.new(type, prop)
+        print(output)
         socket = next((s for s in node.inputs if s.identifier==output.identifier))
         socket.default_value = value
+        print(socket)
 
     ensure_output("Location Longitude", observatory.location.longitude, "NodeSocketFloat")
     ensure_output("Location Latitude", observatory.location.latitude, "NodeSocketFloat")
+    ensure_output("Hour", observatory.time.hour, "NodeSocketFloat")
     ensure_output("Sky Background", observatory.bl_rna.properties["sky_background"].enum_items[observatory.sky_background].value, "NodeSocketFloat")
 
     def ensure_grid_outputs(grid, name):
@@ -63,6 +66,9 @@ def update_nodegroup(scene, context):
     ensure_grid_outputs(observatory.equatorial_grid, "Equatorial Grid")
     ensure_grid_outputs(observatory.ecliptic_grid, "Ecliptic Grid")
     ensure_grid_outputs(observatory.galactic_grid, "Galactic Grid")
+
+    ensure_output("Target Longitude", interferometry.target.longitude, "NodeSocketFloat")
+    ensure_output("Target Latitude", interferometry.target.latitude, "NodeSocketFloat")
 
 
 def get_image_data_prop(name, create=False, width=128, height=128):

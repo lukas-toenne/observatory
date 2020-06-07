@@ -333,7 +333,7 @@ class InterferometrySettings(bpy.types.PropertyGroup):
 
 
 @persistent
-def load_handler(dummy):
+def load_handler(scene):
     # Restart timers where needed
     for scene in bpy.data.scenes:
         scene.interferometry.auto_generate_images_update(bpy.context)
