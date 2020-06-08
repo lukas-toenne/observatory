@@ -34,6 +34,11 @@ import queue
 sampling_queue = queue.Queue(maxsize=1)
 pointspread_queue = queue.Queue(maxsize=1)
 
+icon_size = (16, 16)
+icon_numpixels = icon_size[0] * icon_size[1]
+icon_pixels = [127, 127, 127, 255] * icon_numpixels
+icon_pixels_float = [0.5, 0.5, 0.5, 1.0] * icon_numpixels
+
 margin = 3
 
 """
@@ -52,6 +57,12 @@ def update_image_pixels(image, pixels, width, height, allow_resize=False):
         assert(image.source == 'GENERATED')
         assert(image.size[0] == width)
         assert(image.size[1] == height)
+
+    # XXX Workaround for Blender bug: Icon preview job creates a race condition vs. pixel updates:
+    # https://developer.blender.org/T77571
+    image.preview.icon_size = icon_size
+    image.preview.icon_pixels = icon_pixels
+    image.preview.icon_pixels_float = icon_pixels_float
 
     image.pixels = pixels
     image.preview.reload()
