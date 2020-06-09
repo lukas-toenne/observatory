@@ -250,6 +250,14 @@ class InterferometrySettings(bpy.types.PropertyGroup):
         antennas = data_links.get_antenna_collection()
         objects = set(antennas.objects)
         for u in updates:
+            # XXX Workaround for Blender crash:
+            # If an object is deleted the 'original' property access will crash.
+            # Check if the object still exists in the db.
+            if u.id.type == 'OBJECT' and u.id.name not in bpy.data.objects:
+                continue
+            if u.id.type == 'COLLECTION' and u.id.name not in bpy.data.collections:
+                continue
+
             id_data = u.id.original
             if id_data is antennas:
                 return True
