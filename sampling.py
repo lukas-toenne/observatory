@@ -39,8 +39,6 @@ icon_numpixels = icon_size[0] * icon_size[1]
 icon_pixels = [127, 127, 127, 255] * icon_numpixels
 icon_pixels_float = [0.5, 0.5, 0.5, 1.0] * icon_numpixels
 
-margin = 3
-
 """
 Write pixel data into image data block.
 WARNING: This should only be done on the main thread using the sampling queue!
@@ -115,9 +113,8 @@ Convert data array into image pixels.
 def ndarray_to_pixels(array, mapping=(0.0, 1.0)):
     assert(len(array.shape) == 2)
 
-    w = array.shape[0]
-    h = array.shape[1]
-    values = np.clip(array / (mapping[1] - mapping[0]) - mapping[0], mapping[0], mapping[1]).astype(np.float32)
+    h, w = array.shape
+    values = np.clip(np.real(array) / (mapping[1] - mapping[0]) - mapping[0], mapping[0], mapping[1]).astype(np.float32)
 
     imgdata = np.dstack((values, values, values, np.ones(values.shape)))
     return imgdata.flatten().tolist()
@@ -127,6 +124,7 @@ def compute_sampling_image(scene, antennas):
         return False
     w = scene.interferometry.image_width
     h = scene.interferometry.image_height
+    numpixels = w * h
     if w < 1 or h < 1:
         return False
 
@@ -149,42 +147,41 @@ def compute_sampling_image(scene, antennas):
     #         bounds_max.y = a.y
 
     epsilon = 1.0e-6
-    scale = (0.5 * min(w, h) - margin) / Bmax
+    scale = (min(w, h) / 4) / Bmax
     invscale = 1.0/scale if scale > epsilon else 1.0
-
 
     # Construct sampling from baselines
     # For real-valued output the input is complex conjugate
     # and irfft expects only the positive components.
-    sampling = np.zeros((w + 1, h*2 + 1), dtype=np.float32)
+    sampling = np.zeros((h, w), dtype=np.complex64)
+    num_baselines = len(antennas) * (len(antennas) - 1)
     for i, a in enumerate(antennas):
         for b in antennas[i+1:]:
             B = b.xy - a.xy
             s = B * scale
             # Symmetric sampling in the uv space
-            # Ignore value with negative real part
-            if s.x >= 0.0:
-                sampling[int(0.5 + s.x), int(h/2 + 0.5 + s.y)] = 1.0
-            else:
-                sampling[int(0.5 + s.x), int(h/2 + 0.5 - s.y)] = 1.0
+            sampling[int(h/2 + 0.5 + s.y), int(w/2 + 0.5 + s.x)] = 1.0
+            sampling[int(h/2 + 0.5 - s.y), int(w/2 + 0.5 - s.x)] = 1.0
 
     # Compute point spread function
-    pointspread = fft.irfft2(sampling, s=(w, h), norm="ortho")
+    fftin = fft.ifftshift(sampling)
+    fftout = fft.ifft2(fftin)
+    pointspread = fft.fftshift(fftout) * numpixels / num_baselines
 
     enqueue_image_pixel_update(
         sampling_queue,
         get_image=lambda scene: scene.interferometry.get_sampling_image(create=True),
         pixels=ndarray_to_pixels(sampling),
-        width=sampling.shape[0],
-        height=sampling.shape[1],
+        width=sampling.shape[1],
+        height=sampling.shape[0],
         allow_resize=True,
         )
     enqueue_image_pixel_update(
         pointspread_queue,
         get_image=lambda scene: scene.interferometry.get_pointspread_image(create=True),
-        pixels=ndarray_to_pixels(pointspread, mapping=(0.0, 0.1)),
-        width=pointspread.shape[0],
-        height=pointspread.shape[1],
+        pixels=ndarray_to_pixels(pointspread, mapping=(0.0, 1.0)),
+        width=pointspread.shape[1],
+        height=pointspread.shape[0],
         allow_resize=True,
         )
 
