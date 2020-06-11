@@ -253,9 +253,9 @@ class InterferometrySettings(bpy.types.PropertyGroup):
             # XXX Workaround for Blender crash:
             # If an object is deleted the 'original' property access will crash.
             # Check if the object still exists in the db.
-            if u.id.type == 'OBJECT' and u.id.name not in bpy.data.objects:
+            if isinstance(u.id, bpy.types.Object) and u.id.name not in bpy.data.objects:
                 continue
-            if u.id.type == 'COLLECTION' and u.id.name not in bpy.data.collections:
+            if isinstance(u.id, bpy.types.Collection) and u.id.name not in bpy.data.collections:
                 continue
 
             id_data = u.id.original

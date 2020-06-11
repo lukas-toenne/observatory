@@ -49,10 +49,8 @@ def update_nodegroup(scene, context):
         output = nodegroup.outputs.get(prop)
         if output is None:
             output = nodegroup.outputs.new(type, prop)
-        print(output)
         socket = next((s for s in node.inputs if s.identifier==output.identifier))
         socket.default_value = value
-        print(socket)
 
     ensure_output("Location Longitude", observatory.location.longitude, "NodeSocketFloat")
     ensure_output("Location Latitude", observatory.location.latitude, "NodeSocketFloat")
