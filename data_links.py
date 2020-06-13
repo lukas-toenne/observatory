@@ -67,6 +67,8 @@ def update_nodegroup(scene, context):
 
     ensure_output("Target Longitude", interferometry.target.longitude, "NodeSocketFloat")
     ensure_output("Target Latitude", interferometry.target.latitude, "NodeSocketFloat")
+    ensure_output("Equatorial Rotation", observatory.equatorial_rotation.to_euler('ZYX'), "NodeSocketVector")
+
 
 
 def get_image_data_prop(name, create=False, width=128, height=128):

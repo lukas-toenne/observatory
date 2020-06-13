@@ -54,7 +54,7 @@ def parse_hour_angle(hourstr, default):
     print(m.group("hours"), m.group("minutes"), m.group("seconds"))
     return 0.0
 
-def MakeCelestialCoordinate(default=(0.0, 0.0), update=None):
+def MakeCelestialCoordinate(default=(0.0, 0.0), update=None, get=None, set=None):
     class CelestialCoordinateProp(PropertyGroup):
         co : FloatVectorProperty(
             name="Coordinate",
@@ -64,6 +64,8 @@ def MakeCelestialCoordinate(default=(0.0, 0.0), update=None):
             unit='ROTATION',
             default=default,
             update=update,
+            get=get,
+            set=set,
             )
 
         def _get_longitude(self):
@@ -133,13 +135,17 @@ def MakeCelestialCoordinate(default=(0.0, 0.0), update=None):
 def horizontal_to_equatorial(co, observer, sidereal_angle):
     A = co[0]
     a = co[1]
-    h = atan2(sin(A), cos(A)*sin(observer.co[1]) + tan(a)*cos(observer.co[1]))
-    delta = asin(sin(a)*sin(observer.co[1]) - cos(a)*cos(A)*cos(observer.co[1]))
+    sobs = sin(observer.co[1])
+    cobs = cos(observer.co[1])
+    h = atan2(sin(A), cos(A)*sobs + tan(a)*cobs)
+    delta = asin(sin(a)*sobs - cos(a)*cos(A)*cobs)
     return (h + observer.co[0] + sidereal_angle, delta)
 
 def equatorial_to_horizontal(co, observer, sidereal_angle):
     h = co[0] - observer.co[0] - sidereal_angle
     delta = co[1]
-    A = atan2(sin(h), cos(h)*sin(observer.co[1]) - tan(delta)*cos(observer.co[1]))
-    a = asin(sin(delta)*sin(observer.co[1]) + cos(delta)*cos(h)*cos(observer.co[1]))
+    sobs = sin(observer.co[1])
+    cobs = cos(observer.co[1])
+    A = atan2(sin(h), cos(h)*sobs - tan(delta)*cobs)
+    a = asin(sin(delta)*sobs + cos(delta)*cos(h)*cobs)
     return (A, a)

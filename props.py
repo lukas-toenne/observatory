@@ -29,6 +29,7 @@ from bpy.props import BoolProperty, EnumProperty, FloatProperty, FloatVectorProp
 from bpy.types import PropertyGroup
 from bpy.app.handlers import persistent
 from math import *
+from mathutils import Euler, Quaternion, Vector, Matrix
 import time
 from .coordinates import MakeCelestialCoordinate, horizontal_to_equatorial, equatorial_to_horizontal
 from . import data_links, sampling
@@ -129,6 +130,16 @@ GalacticGridSettings = MakeGridSettings(def_enabled=False, def_color=(0.233609, 
 class ObservatorySettings(bpy.types.PropertyGroup):
     location : PointerProperty(type=ObservatoryLocation)
 
+    def get_equatorial_rotation(self):
+        return Euler((self.location.co[1], -self.location.co[0] - self.time.earth_rotation, 0), 'ZYX').to_quaternion()
+    equatorial_rotation : FloatVectorProperty(
+        name="Equatorial Rotation",
+        description="Rotation of the equatorial reference frame to world space",
+        size=4,
+        subtype='QUATERNION',
+        get=get_equatorial_rotation,
+        )
+
     time : PointerProperty(type=TimeProp)
 
     sky_background : EnumProperty(
@@ -182,17 +193,14 @@ class InterferometrySettings(bpy.types.PropertyGroup):
         return self.id_data.observatory
 
     target : PointerProperty(type=TargetCoordinate)
-
-    def get_target_horizontal(self):
-        return equatorial_to_horizontal(self.target.co, self.observatory.location, self.observatory.time.earth_rotation)
-    target_horizontal : FloatVectorProperty(
-        name="Horizontal Target",
-        description="Target coordinates in horizontal reference frame",
-        size=2,
-        subtype='EULER',
-        unit='ROTATION',
-        get=get_target_horizontal,
-        update=update_generic,
+    def get_target_rotation(self):
+        return self.observatory.equatorial_rotation @ Euler((self.target.co[1], -self.target.co[0], 0), 'XYZ').to_quaternion()
+    target_rotation : FloatVectorProperty(
+        name="Target Rotation",
+        description="Target rotation in horizonal coordinates",
+        size=4,
+        subtype='QUATERNION',
+        get=get_target_rotation,
         )
 
     frequency : FloatProperty(
@@ -298,8 +306,11 @@ class InterferometrySettings(bpy.types.PropertyGroup):
     def draw(self, context, layout):
         self.target.draw_long_lat(context, layout, label="Target")
 
-        layout.prop(self, "frequency_mhz", text="Frequency (MHz)")
-        layout.prop(self, "wavelength")
+        layout.separator()
+
+        row = layout.row(align=True)
+        row.prop(self, "frequency_mhz", text="Frequency (MHz)")
+        row.prop(self, "wavelength")
 
         layout.label(text="Image size:")
         row = layout.row(align=True)
